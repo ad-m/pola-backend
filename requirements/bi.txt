@@ -24,7 +24,7 @@ minimal-snowplow-tracker==0.0.2
 msgpack==1.0.3
 networkx==2.6.3
 packaging==21.3
-parsedatetime==2.4
+parsedatetime==2.6
 psycopg2-binary==2.9.3
 pycparser==2.21
 pyparsing==3.0.7
