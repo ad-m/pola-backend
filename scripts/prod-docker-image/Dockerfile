@@ -3,7 +3,7 @@ ARG APP_GID="50000"
 
 ARG APP_HOME=/opt/pola-backend
 
-ARG PYTHON_VERSION="3.9"
+ARG BASE_PYTHON_IMAGE="python:3.9-slim-bullseye"
 
 ######################### NODE BUILD IMAGE ##########################
 
@@ -18,10 +18,11 @@ COPY ./pola/assets /app/pola/assets
 RUN npm run build
 
 ######################### PYTHON BUILD IMAGE ########################
-ARG PYTHON_VERSION
+ARG BASE_PYTHON_IMAGE
 ARG APP_HOME
 
-FROM python:${PYTHON_VERSION}-slim-buster as build-py
+# hadolint ignore=DL3006
+FROM ${BASE_PYTHON_IMAGE} as build-py
 
 ARG APP_HOME
 ENV APP_HOME=${APP_HOME}
@@ -37,15 +38,20 @@ RUN apt-get update \
         binutils \
         binutils-common \
         binutils-x86-64-linux-gnu \
+        curl \
         gcc \
         git \
+        gnupg2 \
         libc6-dev \
         libcc1-0 \
-        libgcc-8-dev \
+        linux-libc-dev \
+        lsb-release \
+    && curl https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
+    && echo "deb https://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
         libpq-dev \
         libpq5 \
-        linux-libc-dev \
-        netcat-openbsd \
     && apt-get autoremove -yqq --purge \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
@@ -55,25 +61,24 @@ ENV PYTHONUNBUFFERED=1 \
     PATH=${PATH}:/root/.local/bin
 RUN mkdir -p /root/.local/bin && pip install --no-cache-dir --upgrade "pip" && pip --version
 
-COPY ./requirements/production.txt ${APP_HOME}/requirements/
+COPY ./dependencies/constraints-production.txt ./dependencies/requirements-production.txt ./dependencies/requirements-production-django.txt ${APP_HOME}/dependencies/
 
-RUN pip install --no-cache-dir --user -r "${APP_HOME}/requirements/production.txt" \
+RUN pip install \
+      --no-cache-dir \
+      --user \
+      --requirement "${APP_HOME}/dependencies/requirements-production.txt" \
+      --requirement "${APP_HOME}/dependencies/requirements-production-django.txt" \
+      --constraint "${APP_HOME}/dependencies/constraints-production.txt" \
     && pip check \
-    && find /root/.local/ -name '*.pyc' -print0 | xargs -0 rm -r \
-    && find /root/.local/ -type d -name '__pycache__' -print0 | xargs -0 rm -r \
+    && find /root/.local/ -name '*.pyc' -delete \
+    && find /root/.local/ -type d -name '__pycache__' -delete \
     # make sure that all directories and files in .local are also group accessible
     && find /root/.local -executable -print0 | xargs --null chmod g+x  \
     && find /root/.local -print0 | xargs --null chmod g+rw
 
-LABEL io.github.klubjagiellonski.distro="debian" \
-    io.github.klubjagiellonski.distro.version="buster" \
-    io.github.klubjagiellonski.module="pola" \
-    io.github.klubjagiellonski.component="pola-backend" \
-    io.github.klubjagiellonski.image="pola-backend"
-
 ######################### MAIN IMAGE ################################
-
-FROM python:${PYTHON_VERSION}-slim-buster as main
+# hadolint ignore=DL3006
+FROM ${BASE_PYTHON_IMAGE} as main
 
 ARG APP_UID
 ARG APP_GID
@@ -97,9 +102,9 @@ RUN apt-get update \
         ca-certificates \
         curl \
         dumb-init \
+        gnupg2 \
         locales \
         lsb-release \
-        postgresql-client \
         sudo \
         # Required by encrypoint.sh
         netcat \
@@ -107,6 +112,12 @@ RUN apt-get update \
         openssh-client \
         openssh-server \
         iproute2 \
+    && curl https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
+    && echo "deb https://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+        postgresql-client \
+        libpq5 \
     && apt-get autoremove -yqq --purge \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
@@ -119,7 +130,8 @@ RUN apt-get update \
     && mkdir -pv "${APP_HOME}" \
     && chown -R "pola-backend:root" "${APP_USER_HOME_DIR}" "${APP_HOME}" \
     && find "${APP_HOME}" -executable -print0 | xargs --null chmod g+x  \
-    && find "${APP_HOME}" -print0 | xargs --null chmod g+rw
+    && find "${APP_HOME}" -print0 | xargs --null chmod g+rw \
+    && rm -rf /var/log/* /var/cache/*
 
 COPY --chown=pola-backend:root --from=build-py /root/.local "${APP_USER_HOME_DIR}/.local"
 COPY --chown=pola-backend:root --from=build-js /app/pola/static/js/ "${APP_HOME}/pola/static/js/"
@@ -152,12 +164,6 @@ USER ${APP_UID}
 
 ARG RELEASE_SHA
 ENV RELEASE_SHA=${RELEASE_SHA}
-
-LABEL io.github.klubjagiellonski.distro="debian" \
-    io.github.klubjagiellonski.distro.version="buster" \
-    io.github.klubjagiellonski.module="pola" \
-    io.github.klubjagiellonski.component="pola-backend" \
-    io.github.klubjagiellonski.image="pola-backend"
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--", "/entrypoint"]
 CMD ["gunicorn", "pola.config.wsgi:application"]

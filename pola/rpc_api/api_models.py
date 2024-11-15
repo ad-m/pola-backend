@@ -1,6 +1,6 @@
-from typing import List, Optional, TypedDict
+from typing import Optional, TypedDict
 
-from pola import logic
+import pola.logic_score
 from pola.product.models import Product
 
 
@@ -24,14 +24,19 @@ class SearchResult(TypedDict):
         return cls(
             name=str(product),
             code=product.code,
-            company=CompanyBasicInfo(name=product.company.name, score=logic.get_plScore(product.company))
-            if product.company and product.company.name
-            else None,
+            company=(
+                CompanyBasicInfo(
+                    name=product.company.common_name or product.company.name,
+                    score=pola.logic_score.get_pl_score(product.company),
+                )
+                if product.company and (product.company.common_name or product.company.name)
+                else None
+            ),
             brand=BrandBasicInfo(name=product.brand.name) if product.brand and product.brand.name else None,
         )
 
 
 class SearchResultCollection(TypedDict):
     nextPageToken: Optional[str]
-    products: List[SearchResult]
+    products: list[SearchResult]
     totalItems: int

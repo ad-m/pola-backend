@@ -12,18 +12,15 @@ CONTAINER_REGISTRY="$(echo "${CONTAINER_REGISTRY}" | tr '[:upper:]' '[:lower:]')
 readonly CONTAINER_REGISTRY
 
 # Django/Python
-DJANGO_VERSION_PROD=$(grep -i "^django==" "${SCRIPT_DIR}/../requirements/production.txt" | cut -d "=" -f 3)
+DJANGO_VERSION_PROD=$(grep -i "^django==" "${SCRIPT_DIR}/../dependencies/constraints-production.txt" | cut -d "=" -f 3)
 readonly DJANGO_VERSION_PROD
 DJANGO_VERSION="${DJANGO_VERSION:="${DJANGO_VERSION_PROD}"}"
 readonly DJANGO_VERSION
-PYTHON_VERSION="${PYTHON_VERSION:="3.9"}"
+PYTHON_VERSION="${PYTHON_VERSION:="3.11"}"
 readonly PYTHON_VERSION
 
 # Docker
 IMAGE_TAG="${IMAGE_TAG:="latest"}"
 CI_IMAGE_NAME="${CONTAINER_REGISTRY}/pola-backend-${DJANGO_VERSION}-${PYTHON_VERSION}-ci"
 BI_IMAGE_NAME="${CONTAINER_REGISTRY}/pola-bi"
-
-BUILD_JS_IMAGE_NAME="${CONTAINER_REGISTRY}/pola-backend-build-js"
-BUILD_PY_IMAGE_NAME="${CONTAINER_REGISTRY}/pola-backend-build-py"
 PROD_IMAGE_NAME="${CONTAINER_REGISTRY}/pola-backend"

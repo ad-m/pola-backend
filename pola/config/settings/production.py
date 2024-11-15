@@ -7,10 +7,12 @@ Production Configurations
 - Use Redis on Heroku
 
 """
+
 # pylint: disable=unused-wildcard-import
 
 import os
 import tempfile
+from pathlib import Path
 from urllib import parse as urlparse
 
 import sentry_sdk
@@ -65,14 +67,14 @@ AWS_PRELOAD_METADATA = True
 COLLECTFAST_STRATEGY = "collectfast.strategies.boto3.Boto3Strategy"
 COLLECTFAST_THREADS = 20
 
-INSTALLED_APPS = ('collectfast',) + INSTALLED_APPS  # noqa: F405
+INSTALLED_APPS = ('collectfast',) + INSTALLED_APPS
 
 # EMAIL
 # ------------------------------------------------------------------------------
 DEFAULT_FROM_EMAIL = env('DJANGO_DEFAULT_FROM_EMAIL')  # noqa: F405
 ANYMAIL = {
     "MAILGUN_API_KEY": env('DJANGO_MAILGUN_API_KEY'),  # noqa: F405
-    "MAILGUN_API_URL": "https://api.eu.mailgun.net/v3",  # noqa: F405
+    "MAILGUN_API_URL": "https://api.eu.mailgun.net/v3",
     "MAILGUN_SENDER_DOMAIN": env('DJANGO_MAILGUN_SERVER_NAME'),  # noqa: F405
 }
 EMAIL_BACKEND = "anymail.backends.mailgun.EmailBackend"
@@ -102,7 +104,7 @@ redis_url = urlparse.urlparse(os.environ.get('REDISTOGO_URL', 'redis://localhost
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
-        'LOCATION': os.path.join(tempfile.gettempdir(), 'pola-app-cache'),
+        'LOCATION': Path(tempfile.gettempdir()) / 'pola-app-cache',
     },
     'redis': {
         'BACKEND': 'redis_cache.RedisCache',
@@ -123,3 +125,5 @@ sentry_sdk.init(
     release=env.str('RELEASE_SHA'),  # noqa: F405
     traces_sample_rate=env.float('SENTRY_TRACES_SAMPLE_RATE', default=0),  # noqa: F405
 )
+
+USE_ESCAPED_S3_PATHS = False

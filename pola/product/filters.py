@@ -1,12 +1,12 @@
 import django_filters
 from dal import autocomplete
 from django import forms
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 
 from pola.company.models import Company
 from pola.filters import CrispyFilterMixin
 
-from .models import Product
+from . import models
 
 
 class NullProductFilter(django_filters.Filter):
@@ -39,8 +39,8 @@ class ProductFilter(CrispyFilterMixin, django_filters.FilterSet):
     )
 
     class Meta:
-        model = Product
+        model = models.Product
         fields = {
             'name': ['icontains'],
-            'code': ['icontains'],
+            'code': ['icontains', 'istartswith'],
         }

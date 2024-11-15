@@ -1,14 +1,17 @@
 import json
 
+import environ
 import requests
 from test_plus import TestCase
 
 from pola.ai_pics.models import AIAttachment, AIPics
 from pola.company.factories import CompanyFactory
+from pola.models import DEFAULT_DONATE_TEXT, DEFAULT_DONATE_URL
 from pola.product.factories import ProductFactory
 from pola.product.models import Product
 from pola.report.models import Attachment, Report
-from pola.rpc_api.tests.test_views import JsonRequestMixin, _create_image
+from pola.rpc_api.tests.test_views import JsonRequestMixin
+from pola.tests.test_utils import get_dummy_image
 
 
 class TestAddAiPics(TestCase, JsonRequestMixin):
@@ -38,11 +41,11 @@ class TestAddAiPics(TestCase, JsonRequestMixin):
         response_data = response.json()
         self.assertEqual(len(response_data['signed_requests']), 1)
         signed_url: str = response_data['signed_requests'][0]
-        self.assertTrue(signed_url.startswith("http://minio:9000"))
+        self.assertTrue(signed_url.startswith(environ.Env().str('POLA_APP_AWS_S3_ENDPOINT_URL')))
 
         # Valid signed URL
         response = requests.put(
-            signed_url, data=_create_image(), headers={"x-amz-acl": "public-read", 'Content-Type': 'image/jpeg'}
+            signed_url, data=get_dummy_image(), headers={"x-amz-acl": "public-read", 'Content-Type': 'image/jpeg'}
         )
         self.assertEqual(200, response.status_code, response.text)
 
@@ -107,10 +110,6 @@ class TestGetByCodeV3(TestCase, JsonRequestMixin):
         )
         self.assertEqual(200, response.status_code)
 
-    def test_should_return_200_when_polish_product(self):
-        response = self.json_request(self.url + "?device_id=TEST-DEVICE-ID&code=5900049011829")
-        self.assertEqual(200, response.status_code, response.content)
-
     def test_should_return_200_when_product_without_company(self):
         p = Product(code=5900049011829)
         p.name = "test-product"
@@ -142,6 +141,7 @@ class TestGetByCodeV3(TestCase, JsonRequestMixin):
         self.maxDiff = None
         self.assertEqual(
             {
+                'all_company_brands': [],
                 "product_id": p.id,
                 "code": "5900049011829",
                 "name": c.official_name,
@@ -158,6 +158,8 @@ class TestGetByCodeV3(TestCase, JsonRequestMixin):
                 "plRegistered_notes": "DDD",
                 "plNotGlobEnt": 100,
                 "plNotGlobEnt_notes": "EEE",
+                'logotype_url': None,
+                'official_url': None,
                 "report_text": "Zg\u0142o\u015b je\u015bli posiadasz bardziej aktualne dane na temat tego produktu",
                 "report_button_text": "Zg\u0142o\u015b",
                 "report_button_type": "type_white",
@@ -167,8 +169,8 @@ class TestGetByCodeV3(TestCase, JsonRequestMixin):
                 "sources": {"TEST": "BBBB"},
                 "donate": {
                     "show_button": True,
-                    "url": "https://klubjagiellonski.pl/zbiorka/wspieraj-aplikacje-pola/",
-                    "title": "Potrzebujemy 1 zł",
+                    "url": DEFAULT_DONATE_URL,
+                    "title": DEFAULT_DONATE_TEXT,
                 },
             },
             json.loads(response.content),
@@ -198,14 +200,17 @@ class TestGetByCodeV3(TestCase, JsonRequestMixin):
         self.maxDiff = None
         self.assertEqual(
             {
+                'all_company_brands': [
+                    {'logotype_url': None, 'name': p.brand.common_name, 'website_url': p.brand.website_url}
+                ],
                 'altText': None,
                 'card_type': 'type_white',
                 'code': '5900049011829',
                 'description': 'TEST',
                 'donate': {
                     'show_button': True,
-                    'title': 'Potrzebujemy 1 zł',
-                    'url': 'https://klubjagiellonski.pl/zbiorka/wspieraj-aplikacje-pola/',
+                    'title': DEFAULT_DONATE_TEXT,
+                    'url': DEFAULT_DONATE_URL,
                 },
                 'friend_text': 'To jest przyjaciel Poli',
                 'is_friend': True,
@@ -221,6 +226,8 @@ class TestGetByCodeV3(TestCase, JsonRequestMixin):
                 'plScore': 70,
                 'plWorkers': 0,
                 'plWorkers_notes': 'BBB',
+                'logotype_url': None,
+                'official_url': None,
                 'product_id': p.pk,
                 'report_button_text': 'Zgłoś',
                 'report_button_type': 'type_white',
@@ -251,10 +258,10 @@ class TestCreateReportV3(TestCase, JsonRequestMixin):
         response_data = response.json()
         self.assertEqual(len(response_data['signed_requests']), 1)
         signed_url: str = response_data['signed_requests'][0]
-        self.assertTrue(signed_url.startswith("http://minio:9000"))
+        self.assertTrue(signed_url.startswith(environ.Env().str('POLA_APP_AWS_S3_ENDPOINT_URL')))
 
         # Valid signed URL
-        response = requests.put(signed_url, data=_create_image(), headers={'Content-Type': 'image/jpeg'})
+        response = requests.put(signed_url, data=get_dummy_image(), headers={'Content-Type': 'image/jpeg'})
         self.assertEqual(200, response.status_code, response.text)
 
         # Assert Report

@@ -2,7 +2,9 @@ import reversion
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Reset, Submit
 from django import forms
-from django.utils.translation import ugettext as _
+from django.utils.translation import gettext as _
+
+from pola import models
 
 
 class HelperMixin:
@@ -65,3 +67,9 @@ class ReadOnlyFieldsMixin:
             cleaned_data[field] = getattr(self.instance, field)
 
         return cleaned_data
+
+
+class AppConfigurationForm(SaveButtonMixin, FormHorizontalMixin, forms.ModelForm):
+    class Meta:
+        model = models.AppConfiguration
+        fields = ['donate_text', 'donate_url']

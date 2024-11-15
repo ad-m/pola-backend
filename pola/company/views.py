@@ -1,7 +1,10 @@
 # Create your views here.
+import typing
+
 from braces.views import FormValidMessageMixin
 from dal import autocomplete
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db.models import Sum
 from django.http import HttpResponseRedirect, QueryDict
 from django.urls import reverse, reverse_lazy
 from django.views.generic.detail import DetailView
@@ -20,8 +23,15 @@ from pola.product.models import Product
 from pola.report.models import Report
 from pola.views import ExprAutocompleteMixin
 
+from ..logic_score import get_pl_score
 from .filters import BrandFilter, CompanyFilter
-from .forms import BrandForm, CompanyCreateFromKRSForm, CompanyForm
+from .forms import (
+    BrandForm,
+    BrandFormSet,
+    BrandFormSetHelper,
+    CompanyCreateFromKRSForm,
+    CompanyForm,
+)
 
 
 class CompanyListView(LoginPermissionRequiredMixin, FilterView):
@@ -43,6 +53,26 @@ class CompanyCreate(GetInitalFormMixin, LoginPermissionRequiredMixin, FormValidM
     model = Company
     form_class = CompanyForm
     form_valid_message = "Firma utworzona!"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        if self.request.POST:
+            context['brand_formset'] = BrandFormSet(self.request.POST)
+        else:
+            context['brand_formset'] = BrandFormSet()
+        context['brand_formset_helper'] = BrandFormSetHelper()
+        return context
+
+    def form_valid(self, form):
+        context = self.get_context_data(form=form)
+        formset = context['brand_formset']
+        if formset.is_valid():
+            response = super().form_valid(form)
+            formset.instance = self.object
+            formset.save()
+            return response
+        else:
+            return super().form_invalid(form)
 
 
 class CompanyCreateFromKRSView(LoginPermissionRequiredMixin, FormView):
@@ -68,6 +98,24 @@ class CompanyUpdate(LoginPermissionRequiredMixin, FormValidMessageMixin, Concure
     form_class = CompanyForm
     concurency_url = reverse_lazy('concurency:lock')
     form_valid_message = "Firma zaktualizowana!"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        if self.request.POST:
+            context['brand_formset'] = BrandFormSet(self.request.POST, instance=self.object)
+        else:
+            context['brand_formset'] = BrandFormSet(instance=self.object)
+        context['brand_formset_helper'] = BrandFormSetHelper()
+        return context
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        formset = BrandFormSet(self.request.POST, instance=self.object)
+        if formset.is_valid():
+            formset.save()
+        else:
+            return super().form_invalid(form)
+        return response
 
 
 class CompanyDelete(LoginPermissionRequiredMixin, FormValidMessageMixin, DeleteView):
@@ -114,6 +162,18 @@ class FieldsDisplayMixin:
         return None
 
 
+class CompanyCardModel(typing.NamedTuple):
+    pl_score: int
+    pl_capital: int
+    pl_workers: bool
+    pl_rnd: bool
+    pl_registered: bool
+    pl_not_glob_ent: bool
+    product_count: int
+    product_query_count: int
+    most_popular_code: str
+
+
 class CompanyDetailView(FieldsDisplayMixin, LoginPermissionRequiredMixin, DetailView):
     model = Company
     permission_required = 'company.view_company'
@@ -134,16 +194,30 @@ class CompanyDetailView(FieldsDisplayMixin, LoginPermissionRequiredMixin, Detail
         'verified',
         'address',
         'nip',
+        'logotype',
+        'official_url',
     )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        context['report_list'] = Report.objects.only_open().filter(product__company=self.get_object())
+        context['report_list'] = Report.objects.only_open().filter(product__company=self.object)
 
-        context['brand_list'] = Brand.objects.filter(company=self.get_object())
-        context['product_list'] = Product.objects.filter(company=self.get_object()).order_by('-query_count')
+        context['brand_list'] = Brand.objects.filter(company=self.object)
+        context['product_list'] = Product.objects.filter(company=self.object).order_by('-query_count')
 
+        if self.object.verified:
+            context['company_card'] = CompanyCardModel(
+                pl_score=get_pl_score(self.object),
+                pl_capital=self.object.plCapital,
+                pl_workers=self.object.plWorkers,
+                pl_rnd=self.object.plRnD,
+                pl_registered=self.object.plRegistered,
+                pl_not_glob_ent=self.object.plNotGlobEnt,
+                product_count=context['product_list'].count(),
+                product_query_count=context['product_list'].aggregate(total=Sum('query_count'))['total'] or 0,
+                most_popular_code=context['product_list'].first().code if context['product_list'] else None,
+            )
         return context
 
 
@@ -171,7 +245,7 @@ class BrandCreate(GetInitalFormMixin, LoginPermissionRequiredMixin, FormValidMes
 
     def get_success_url(self):
         if self.object.company:
-            return reverse("company:detail", args=[self.object.company.pk])
+            return reverse("company:brand-detail", args=[self.object.company.pk])
         return reverse("company:brand-detail", args=[self.object.pk])
 
 
@@ -208,6 +282,15 @@ class BrandDetailView(FieldsDisplayMixin, LoginPermissionRequiredMixin, DetailVi
         'name',
         'common_name',
     )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        context['total_query_count'] = Product.objects.filter(brand=self.object).aggregate(total=Sum('query_count'))[
+            'total'
+        ]
+
+        return context
 
 
 class BrandAutocomplete(LoginRequiredMixin, ExprAutocompleteMixin, autocomplete.Select2QuerySetView):

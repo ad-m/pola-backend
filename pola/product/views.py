@@ -1,9 +1,10 @@
 from braces.views import FormValidMessageMixin, MessageMixin
 from dal import autocomplete
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse_lazy
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 from django.views.decorators.cache import cache_page
 from django.views.generic.detail import DetailView
 from django.views.generic.edit import (
@@ -22,8 +23,7 @@ from pola.product.models import Product
 from pola.report.models import Report
 from pola.views import ExprAutocompleteMixin
 
-from . import models
-from .filters import ProductFilter
+from . import filters, models
 from .forms import AddBulkProductForm, ProductForm
 from .images import Barcode
 
@@ -46,7 +46,7 @@ class ProductDetailView(LoginPermissionRequiredMixin, DetailView):
 class ProductListView(LoginPermissionRequiredMixin, FilterView):
     permission_required = 'product.view_product'
     model = models.Product
-    filterset_class = ProductFilter
+    filterset_class = filters.ProductFilter
     paginate_by = 25
 
 
@@ -87,6 +87,7 @@ class ProductHistoryView(LoginPermissionRequiredMixin, DetailView):
         return context
 
 
+@login_required()
 @cache_page(0)
 def get_image(request, code):
     response = HttpResponse(content_type="image/png")
@@ -121,7 +122,7 @@ class ProductBulkCreate(LoginPermissionRequiredMixin, MessageMixin, FormView):
 
         if failed:
             msg += f"Nie udało się zapisać {len(failed)} produktów.\n"
-            msg += "Niepowodzenia: " + ",".join(f"{p} ({p.code})" for p in failed)
+            msg += "Bledy: " + ",".join(failed)
             self.messages.error(msg, fail_silently=True)
 
         return HttpResponseRedirect(form.cleaned_data['company'].get_absolute_url())

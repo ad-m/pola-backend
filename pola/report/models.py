@@ -1,5 +1,5 @@
 import re
-from os.path import basename
+from pathlib import Path
 
 from babel.dates import format_timedelta
 from django.conf import settings
@@ -9,7 +9,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.urls import reverse
 from django.utils import timezone
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 from model_utils.models import TimeStampedModel
 from reversion.models import Revision
 from storages.backends.s3boto3 import S3Boto3Storage
@@ -98,7 +98,7 @@ class Attachment(models.Model):
 
     @property
     def filename(self):
-        return basename(self.attachment.name)
+        return Path(self.attachment.name).name
 
     def __str__(self):
         return f"{self.filename}"

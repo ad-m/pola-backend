@@ -1,6 +1,8 @@
 #!/usr/bin/python
+from crispy_forms.helper import FormHelper
 from dal import autocomplete
 from django import forms
+from django.forms import inlineformset_factory
 
 from pola.forms import (
     CommitDescriptionMixin,
@@ -13,7 +15,11 @@ from pola.forms import (
 from . import models
 
 
-class CompanyForm(ReadOnlyFieldsMixin, SaveButtonMixin, FormHorizontalMixin, CommitDescriptionMixin, forms.ModelForm):
+class CompanyForm(ReadOnlyFieldsMixin, FormHorizontalMixin, CommitDescriptionMixin, forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper.form_tag = False
+
     readonly_fields = ['name']
 
     class Meta:
@@ -23,6 +29,7 @@ class CompanyForm(ReadOnlyFieldsMixin, SaveButtonMixin, FormHorizontalMixin, Com
             'official_name',
             'common_name',
             'is_friend',
+            'display_brands_in_description',
             'plCapital',
             'plWorkers',
             'plRnD',
@@ -34,6 +41,8 @@ class CompanyForm(ReadOnlyFieldsMixin, SaveButtonMixin, FormHorizontalMixin, Com
             'Editor_notes',
             'nip',
             'address',
+            'logotype',
+            'official_url',
         ]
 
 
@@ -69,5 +78,20 @@ class CompanyCreateFromKRSForm(SingleButtonMixin, FormHorizontalMixin, forms.For
 class BrandForm(SaveButtonMixin, FormHorizontalMixin, forms.ModelForm):
     class Meta:
         model = models.Brand
-        fields = ['name', 'common_name', 'company']
+        fields = ['name', 'common_name', 'company', 'logotype']
         widgets = {'company': autocomplete.ModelSelect2(url='company:company-autocomplete')}
+
+
+BrandFormSet = inlineformset_factory(
+    models.Company, models.Brand, fields=['name', 'common_name', 'company'], exclude=[], can_delete=True
+)
+
+
+class BrandFormSetHelper(FormHelper):
+    template = 'bootstrap/table_inline_formset.html'
+    form_tag = False
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.form_method = 'post'
+        self.render_required_fields = True

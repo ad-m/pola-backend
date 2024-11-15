@@ -1,15 +1,19 @@
 import textwrap
 
+from django.conf import settings
 from django.contrib.postgres.indexes import BrinIndex
 from django.core.validators import ValidationError
 from django.db import connection, models
 from django.forms.models import model_to_dict
 from django.urls import reverse
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
+from django_resized import ResizedImageField
 from model_utils.models import TimeStampedModel
 from reversion import revisions as reversion
+from storages.backends.s3boto3 import S3Boto3Storage
 
 from pola.concurency import concurency
+from pola.logic_score import get_pl_score
 
 
 class IntegerRangeField(models.IntegerField):
@@ -114,11 +118,40 @@ class Company(TimeStampedModel):
     address = models.TextField(null=True, blank=True, verbose_name=_("Adres"))
     query_count = models.PositiveIntegerField(null=False, default=0, db_index=True)
 
+    logotype = ResizedImageField(
+        _("Logotyp"),
+        upload_to='company-logotype/%Y/%m/%d',
+        size=[None, 200],
+        null=True,
+        blank=True,
+        force_format='PNG',
+        storage=S3Boto3Storage(
+            querystring_auth=False,
+            bucket_name=settings.AWS_STORAGE_COMPANY_LOGOTYPE_BUCKET_NAME,
+            region_name='eu-central-1',
+            default_acl=None,
+        ),
+    )
+    official_url = models.URLField(
+        _("Link do strony firmy"),
+        null=True,
+        blank=True,
+    )
+
     is_friend = models.BooleanField(
         default=False, verbose_name=_("Przyjaciel Poli"), choices=((True, _("Tak")), (False, _("Nie")))
     )
+    display_brands_in_description = models.BooleanField(
+        default=False,
+        verbose_name=_("Wyświetlaj informacje o markach w opisie"),
+        choices=((True, _("Tak")), (False, _("Nie"))),
+    )
 
     objects = CompanyQuerySet.as_manager()
+
+    @property
+    def pl_score(self):
+        return get_pl_score(self)
 
     def increment_query_count(self):
         with connection.cursor() as cursor:
@@ -266,6 +299,22 @@ class Brand(TimeStampedModel):
     )
     common_name = models.CharField(max_length=128, null=True, blank=True, verbose_name=_("Nazwa dla użytkownika"))
     objects = BrandQuerySet.as_manager()
+    logotype = ResizedImageField(
+        _("Logotyp"),
+        upload_to='brand-logotype/%Y/%m/%d',
+        size=[None, 200],
+        null=True,
+        blank=True,
+        force_format='PNG',
+        storage=S3Boto3Storage(
+            querystring_auth=False,
+            bucket_name=settings.AWS_STORAGE_COMPANY_LOGOTYPE_BUCKET_NAME,
+            region_name='eu-central-1',
+        ),
+    )
+    website_url = models.CharField(
+        max_length=128, null=False, blank=False, verbose_name=_("URL marki"), default="example.pl"
+    )
 
     def __str__(self):
         return self.common_name or self.name
@@ -276,7 +325,7 @@ class Brand(TimeStampedModel):
     class Meta:
         verbose_name = _("Marka")
         verbose_name_plural = _("Marki")
-        ordering = ['-created']
+        ordering = ['-name']
         permissions = (
             # ("view_brand", "Can see all brands"),
         )

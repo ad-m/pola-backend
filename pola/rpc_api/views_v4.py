@@ -3,10 +3,10 @@ from django.db.models import Q
 from django.http import JsonResponse
 from django.utils.decorators import method_decorator
 from django.views import View
-from ratelimit.decorators import ratelimit
+from django_ratelimit.decorators import ratelimit
 
 from pola import logic, logic_ai
-from pola.models import Query
+from pola.models import AppConfiguration, Query, SearchQuery
 from pola.product.models import Product
 from pola.rpc_api.api_models import SearchResult, SearchResultCollection
 from pola.rpc_api.http import JsonProblemResponse
@@ -54,10 +54,11 @@ def get_by_code_internal(request, ai_supported=False, multiple_company_supported
     if ai_supported:
         result = logic_ai.add_ask_for_pics(product, result)
 
+    app_configuration = AppConfiguration.get_singleton()
     result["donate"] = {
         "show_button": True,
-        "title": "Potrzebujemy 1 zł",
-        "url": "https://klubjagiellonski.pl/zbiorka/wspieraj-aplikacje-pola/",
+        "title": app_configuration.donate_text,
+        "url": app_configuration.donate_url,
     }
     return result
 
@@ -71,8 +72,11 @@ class SearchV4ApiView(View):
         query = request.GET['query']
         qs = self.get_queryset(query)
         paginator = TokenizedPaginator(qs.all(), self.PAGE_SIZE, token_salt=self.__class__.__name__)
+        page_token = request.GET.get('pageToken')
+        if page_token is None:
+            SearchQuery(client=request.GET.get('device_id'), text=query).save()
         try:
-            page = paginator.get_page_by_token(request.GET.get('pageToken'))
+            page = paginator.get_page_by_token(page_token)
         except InvalidPage as e:
             return JsonProblemResponse(status=400, title="Invalid value of pageToken parameter", detail=str(e))
 
@@ -86,7 +90,7 @@ class SearchV4ApiView(View):
 
     def get_queryset(self, query):
         pred = Q(name__icontains=query)
-        if len(query) == 13 and query.isnumeric():
+        if len(query) in (13, 9) and query.isnumeric():
             pred = pred | Q(code=query)
         qs = Product.objects.filter(pred).order_by('pk')
         return qs

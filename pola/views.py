@@ -3,23 +3,28 @@ from datetime import datetime, timedelta
 from functools import reduce
 from textwrap import dedent
 
+from braces.views import FormValidMessageMixin
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
 from django.db import connection
 from django.db.models import Q
 from django.db.models.functions import Length
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, JsonResponse
+from django.urls import reverse_lazy
 from django.utils import timezone
-from django.utils.encoding import force_text
+from django.utils.encoding import force_str
 from django.utils.timezone import get_default_timezone
-from django.views.generic import TemplateView
+from django.utils.translation import gettext_lazy as _
+from django.views.generic import TemplateView, UpdateView
 from django.views.generic.detail import (
     BaseDetailView,
     SingleObjectTemplateResponseMixin,
 )
 
 from pola.company.models import Company
-from pola.models import Stats
+from pola.forms import AppConfigurationForm
+from pola.mixins import LoginPermissionRequiredMixin
+from pola.models import AppConfiguration, Stats
 from pola.product.models import Product
 from pola.report.models import Report
 
@@ -133,7 +138,7 @@ class ActionMixin:
 
     def get_success_url(self):
         if self.success_url:
-            self.success_url = force_text(self.success_url)
+            self.success_url = force_str(self.success_url)
             return self.success_url.format(**self.object.__dict__)
         else:
             raise ImproperlyConfigured("No URL to redirect to. Provide a success_url.")
@@ -244,7 +249,7 @@ class AdminStatsPageView(QueryStatsPageView):
 
 class ReleaseView(TemplateView):
     template_name = "pages/release-info.html"
-    GITHUB_LINK_FORMAT = "https://github.com/KlubJagiellonski/pola-backend/commit/{}"
+    GITHUB_LINK_FORMAT = "https://github.com/KlubJagiellonski/pola-backend/commits/{}"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -257,3 +262,25 @@ class ReleaseView(TemplateView):
             }
         )
         return context
+
+    def render_to_response(self, context, **response_kwargs):
+        if self.request.headers.get('Content-Type') == 'application/json':
+            data = {'release_sha': context['release_sha'], 'release_link': context['release_link']}
+            return JsonResponse(data)
+        else:
+            return super().render_to_response(context, **response_kwargs)
+
+
+class AppConfigurationUpdateView(LoginPermissionRequiredMixin, FormValidMessageMixin, UpdateView):
+    model = AppConfiguration
+    form_class = AppConfigurationForm
+    template_name = 'pages/app_config_form.html'
+    success_url = reverse_lazy("home-cms")
+    permission_required = 'change_appconfiguration'
+    form_valid_message = _("Konfiguracja zaktualizowana!")
+
+    def get_object(self, queryset=None):
+        return AppConfiguration.get_singleton()
+
+    def form_valid(self, form):
+        return super().form_valid(form)

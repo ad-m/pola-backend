@@ -6,6 +6,7 @@ Local settings
 - Add Django Debug Toolbar
 - Add django-extensions as app
 """
+
 from .common import *  # noqa: F403
 
 TEMPLATES[0]['OPTIONS']['debug'] = True  # noqa: F405
@@ -35,3 +36,4 @@ AWS_STORAGE_BUCKET_AI_NAME = env('DJANGO_AWS_STORAGE_BUCKET_AI_NAME', default=No
 
 # Disable Rate Limit
 WHITELIST_API_IP_ADDRESS = ['127.0.0.1']
+USE_ESCAPED_S3_PATHS = False

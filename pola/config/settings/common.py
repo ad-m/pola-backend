@@ -8,9 +8,10 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/dev/ref/settings/
 """
 
+import django
 import environ
 from boto.s3.connection import OrdinaryCallingFormat
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 
 ROOT_DIR = environ.Path(__file__) - 4  # (/a/b/myfile.py - 3 = /)
 APPS_DIR = ROOT_DIR.path('pola')
@@ -49,6 +50,7 @@ THIRD_PARTY_APPS = (
 # Apps specific for this project go here.
 LOCAL_APPS = (
     'pola',
+    'pola.gpc',
     'pola.product',
     'pola.company',
     'pola.report',
@@ -57,8 +59,8 @@ LOCAL_APPS = (
     'pola.users',
     'pola.concurency',
     'pola.rpc_api',
-    'pola.webviews',
     'pola.bi_export',
+    'pola.social',
 )
 
 # See: https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
@@ -139,9 +141,6 @@ SITE_ID = 1
 # See: https://docs.djangoproject.com/en/dev/ref/settings/#use-i18n
 USE_I18N = True
 
-# See: https://docs.djangoproject.com/en/dev/ref/settings/#use-l10n
-USE_L10N = True
-
 # See: https://docs.djangoproject.com/en/dev/ref/settings/#use-tz
 USE_TZ = True
 
@@ -183,31 +182,6 @@ TEMPLATES = [
 
 # See: http://django-crispy-forms.readthedocs.org/en/latest/install.html#template-packs
 CRISPY_TEMPLATE_PACK = 'bootstrap3'
-
-# STATIC FILE CONFIGURATION
-# ------------------------------------------------------------------------------
-# See: https://docs.djangoproject.com/en/dev/ref/settings/#static-root
-STATIC_ROOT = str(ROOT_DIR('staticfiles'))
-
-# See: https://docs.djangoproject.com/en/dev/ref/settings/#static-url
-STATIC_URL = '/static/'
-
-# See: https://docs.djangoproject.com/en/dev/ref/contrib/staticfiles/#std:setting-STATICFILES_DIRS
-STATICFILES_DIRS = [str(APPS_DIR.path('static'))]
-
-# See: https://docs.djangoproject.com/en/dev/ref/contrib/staticfiles/#staticfiles-finders
-STATICFILES_FINDERS = (
-    'django.contrib.staticfiles.finders.FileSystemFinder',
-    'django.contrib.staticfiles.finders.AppDirectoriesFinder',
-)
-
-# MEDIA CONFIGURATION
-# ------------------------------------------------------------------------------
-# See: https://docs.djangoproject.com/en/dev/ref/settings/#media-root
-MEDIA_ROOT = str(APPS_DIR('media'))
-
-# See: https://docs.djangoproject.com/en/dev/ref/settings/#media-url
-MEDIA_URL = '/media/'
 
 # URL Configuration
 # ------------------------------------------------------------------------------
@@ -266,12 +240,8 @@ LOGGING = {
 IS_PRODUCTION = env("IS_PRODUCTION", default=False)
 
 # Your common stuff: Below this line define 3rd party library settings
-PRODUKTY_W_SIECI_API_USERNAME = env("PRODUKTY_W_SIECI_API_USERNAME", default=None)
-PRODUKTY_W_SIECI_API_PASSWORD = env("PRODUKTY_W_SIECI_API_PASSWORD", default=None)
-
 SLACK_TOKEN = env("SLACK_TOKEN", default=None)
 SLACK_CHANNEL_AI_STATS = env("SLACK_CHANNEL_AI_STATS", default=None)
-
 
 WHITELIST_API_IP_ADDRESS = env.list("WHITELIST_API_IP_ADDRESSES", default=['127.0.0.1'])
 
@@ -282,38 +252,67 @@ AI_PICS_PAGE_SIZE = 5000
 # Uploaded Media Files
 # ------------------------
 # See: https://django-storages.readthedocs.io/en/latest/backends/amazon-S3.html
-INSTALLED_APPS += ('storages',)  # noqa: F405
-DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+INSTALLED_APPS += ('storages',)
+if django.VERSION < (4, 0):
+    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+else:
+    STORAGES = {
+        "default": {
+            "BACKEND": 'storages.backends.s3boto3.S3Boto3Storage',
+        },
+        "staticfiles": {
+            "BACKEND": 'storages.backends.s3boto3.S3StaticStorage',
+        },
+    }
 
-AWS_ACCESS_KEY_ID = env('POLA_APP_AWS_ACCESS_KEY_ID')  # noqa: F405
-AWS_SECRET_ACCESS_KEY = env('POLA_APP_AWS_SECRET_ACCESS_KEY')  # noqa: F405
-AWS_STORAGE_BUCKET_NAME = env('POLA_APP_AWS_S3_PUBLIC_BUCKET_NAME')  # noqa: F405
-AWS_STORAGE_BACKEND_BUCKET_NAME = env('POLA_APP_AWS_S3_BACKEND_BUCKET_NAME')  # noqa: F405
-AWS_STORAGE_AI_PICS_BUCKET_NAME = env('POLA_APP_AWS_S3_AI_PICS_BUCKET_NAME')  # noqa: F405
-AWS_STORAGE_WEB_BUCKET_NAME = env.str('POLA_APP_AWS_S3_WEB_BUCKET_NAME', '')  # noqa: F405
+AWS_ACCESS_KEY_ID = env('POLA_APP_AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = env('POLA_APP_AWS_SECRET_ACCESS_KEY')
+AWS_STORAGE_BUCKET_NAME = env('POLA_APP_AWS_S3_PUBLIC_BUCKET_NAME')
+AWS_STORAGE_BACKEND_BUCKET_NAME = env('POLA_APP_AWS_S3_BACKEND_BUCKET_NAME')
+AWS_STORAGE_AI_PICS_BUCKET_NAME = env('POLA_APP_AWS_S3_AI_PICS_BUCKET_NAME')
+AWS_STORAGE_WEB_BUCKET_NAME = env.str('POLA_APP_AWS_S3_WEB_BUCKET_NAME', '')
+AWS_STORAGE_COMPANY_LOGOTYPE_BUCKET_NAME = env('POLA_APP_AWS_S3_COMPANY_LOGOTYPE_BUCKET_NAME')
 # TODO See: https://github.com/jschneier/django-storages/issues/47
 # Revert the following and use str after the above-mentioned bug is fixed in
 # either django-storage-redux or boto
 AWS_EXPIRY = 60 * 60 * 24 * 7
 AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'max-age=%d, s-maxage=%d, must-revalidate' % (AWS_EXPIRY, AWS_EXPIRY)}
 AWS_DEFAULT_ACL = 'public-read'
-AWS_QUERYSTRING_AUTH = env.bool('DJANGO_AWS_QUERYSTRING_AUTH', False)  # noqa: F405
+AWS_QUERYSTRING_AUTH = env.bool('DJANGO_AWS_QUERYSTRING_AUTH', False)
 AWS_S3_CALLING_FORMAT = OrdinaryCallingFormat()
 AWS_S3_SIGNATURE_VERSION = "s3v4"
 AWS_S3_ENDPOINT_URL = env.str('POLA_APP_AWS_S3_ENDPOINT_URL', default=None)
-AI_SHARED_SECRET = env('AI_SHARED_SECRET')  # noqa: F405
+AI_SHARED_SECRET = env('AI_SHARED_SECRET')
 
-# URL that handles the media served from MEDIA_ROOT, used for managing
-# stored files.
+# STATIC FILE CONFIGURATION
+# ------------------------------------------------------------------------------
+# See: https://docs.djangoproject.com/en/dev/ref/settings/#static-root
+STATIC_ROOT = str(ROOT_DIR('staticfiles'))
+
+# See: https://docs.djangoproject.com/en/dev/ref/settings/#static-url
 if AWS_S3_ENDPOINT_URL:
-    MEDIA_URL = f'https://s3.amazonaws.com/{AWS_STORAGE_BUCKET_NAME}/'
+    STATIC_URL = f'{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/'
 else:
-    MEDIA_URL = f'http://localhost:9000/{AWS_STORAGE_BUCKET_NAME}/'
+    STATIC_URL = f"https://{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com/"
+# See: https://docs.djangoproject.com/en/dev/ref/contrib/staticfiles/#std:setting-STATICFILES_DIRS
+STATICFILES_DIRS = [str(APPS_DIR.path('static'))]
 
-# Static Assets
-# ------------------------
-STATICFILES_STORAGE = 'storages.backends.s3boto3.S3StaticStorage'
-STATIC_URL = f'http://localhost:9000/static/{AWS_STORAGE_BUCKET_NAME}/'
+# See: https://docs.djangoproject.com/en/dev/ref/contrib/staticfiles/#staticfiles-finders
+STATICFILES_FINDERS = (
+    'django.contrib.staticfiles.finders.FileSystemFinder',
+    'django.contrib.staticfiles.finders.AppDirectoriesFinder',
+)
+
+# MEDIA CONFIGURATION
+# ------------------------------------------------------------------------------
+# See: https://docs.djangoproject.com/en/dev/ref/settings/#media-root
+MEDIA_ROOT = str(APPS_DIR('media'))
+
+# See: https://docs.djangoproject.com/en/dev/ref/settings/#media-url
+if AWS_S3_ENDPOINT_URL:
+    MEDIA_URL = f'{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BACKEND_BUCKET_NAME}/'
+else:
+    MEDIA_URL = f"https://{AWS_STORAGE_BACKEND_BUCKET_NAME}.s3.amazonaws.com/"
 
 # CORS CONFIGURATION
 # ------------------------
@@ -330,4 +329,17 @@ CORS_URLS_REGEX = r"^/a/.*$"
 
 # APP CONFIGURATION
 # ------------------------
-# None yet
+
+# GET RESPONSE
+# ------------------------------------------------------------------------------
+GET_RESPONSE = {
+    'API_TOKEN': env('POLA_APP_GET_RESPONSE_API_TOKEN'),
+    'CAMPAIGN_ID': env('POLA_APP_GET_RESPONSE_CAMPAIGN_ID'),
+}
+
+# PRODUKTY W SIECI
+# ------------------------------------------------------------------------------
+PRODUKTY_W_SIECI_ENABLE = env.bool("POLA_APP_PRODUKTY_W_SIECI_ENABLE", default=True)
+PRODUKTY_W_SIECI = {
+    'API_TOKEN': env('POLA_APP_PRODUKTY_W_SIECI_API_TOKEN'),
+}

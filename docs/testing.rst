@@ -6,23 +6,23 @@ Testowanie
 Statyczne kontrola kodu
 ^^^^^^^^^^^^^^^^^^^^^^^
 
-Statyczne weryfikacje kodu służy do sprawdzania, czy kod spełnia określone standardy jakości. Wszystkie statyczne kontrole kodu można przeprowadzić za pomocą frameworka `pre-commit <https://pre-commit.com/>`__.
+Statyczna weryfikacja kodu służy do sprawdzenia, czy kod spełnia określone standardy jakości. Wszystkie statyczne kontrole kodu można przeprowadzić za pomocą frameworka `pre-commit <https://pre-commit.com/>`__.
 
 Sprawdzenia pre-commit wykonują całą niezbędną instalację, gdy uruchamiasz je po raz pierwszy.
 
 Pre-commit hooki
 ================
 
-Pre-commi hooki pomagają przyspieszyć lokalny cykl rozwoju i zmniejszyć obciążenie infrastruktury CI. Rozważ zainstalowanie narzędzia pre-commit, aby uruchamiał się automatycznie dla każdego commita.
+Pre-commit hooki pomagają przyspieszyć lokalny cykl rozwoju i zmniejszyć obciążenie infrastruktury CI. Rozważ zainstalowanie narzędzia pre-commit, aby uruchamiał się automatycznie dla każdego commita.
 
-Pre-commi hooki domyślnie sprawdzają tylko pliki, nad którymi aktualnie pracujesz, co czynni je szybkimi. Każdy hook jest instalowany w osobnym śroodowisku niezależnym od systemu, a więc może być pewien, że sprawdzenia wykonane lokalne powiodą się również na środowisku CI.
+Pre-commit hooki domyślnie sprawdzają tylko pliki, nad którymi aktualnie pracujesz, co czynni je szybkimi. Każdy hook jest instalowany w osobnym śroodowisku niezależnym od systemu, a więc może być pewien, że sprawdzenia wykonane lokalne powiodą się również na środowisku CI.
 
 Zintegrowaliśmy fantastyczne ramy pre-commit w naszym przepływie pracy programistycznej. Aby go zainstalować i używać, potrzebujesz lokalnie przynajmniej Pythona 3.6.
 
 Instalacja pre-commit hooków
 ============================
 
-Aby zainstalować haki pre-commit uruchom:
+Aby zainstalować pre-commit uruchom:
 
 .. code-block:: bash
 
@@ -104,11 +104,43 @@ Zawsze możesz pominąć uruchamianie testów, podając flagę ``--no-verify`` w
 
 Po więcej informacji na temat użycia hooków pre-commit, zobacz `Witryna Pre-commit <https://pre-commit.com/>`__.
 
+Testy automatyczne dla Pythona
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Kod logiki jest automatycznie testowny z wykorzystaniem frameworka testowego dostarczonego przez Django. Wszystkie testy znajduja się w katalogach: ``pola/*/tests``
+
+Aby uruchomić wszystkie test uruchom:
+
+.. code-block:: bash
+
+    docker compose run --rm web ./manage.py test
+
+Możesz określić poszczególne testy do uruchomienia, dostarczając dowolną liczbę „etykiet testowych” do komendy ./manage.py. Każda etykieta testowa może być pełną kropkowaną ścieżką Pythona do pakietu, modułu, podklasy TestCase lub metody testowej. Na przykład:
+
+.. code-block:: bash
+
+    # Uruchamia wszystkie testy znalezione w pakiecie pola.company
+    docker compose run --rm web ./manage.py test pola.company
+
+    # Uruchom tylko jeden test case
+    docker compose run --rm web ./manage.py test pola.tests.test_views.TestFrontPageView
+
+    # Uruchamia tylko jedna metode testową
+    docker compose run --rm web ./manage.py test pola.tests.test_views.TestFrontPageView.test_template_used
+
+Możesz również podać ścieżkę do katalogu, aby wykryć testy poniżej tego katalogu:
+
+.. code-block:: bash
+
+    docker compose run --rm web ./manage.py test animals/
+
+Więcej informacji na temat tesotwnia dostępna jest w dokumenttacji Djangoo: `Testing in Django <https://docs.djangoproject.com/pl/3.2/topics/testing/>`__.
+
 Próba przed wykonywania migracji
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Jeśli wprowadzane są większe zmiany w bazie danych warto wykonać próbe wykorzystujać kopie bazy danych.
 
-W tym celu `uruchom przepływ pracy <https://docs.github.com/en/actions/managing-workflow-runs/manually-running-a-workflow>`__ o nazwie `"Migration validation" <https://github.com/KlubJagiellonski/pola-backend/actions/workflows/migration_check.yml>`__ na Github Actionkorzystając z twojej gałęzi.
+W tym celu `uruchom przepływ pracy <https://docs.github.com/en/actions/managing-workflow-runs/manually-running-a-workflow>`__ o nazwie `"Migration validation" <https://github.com/KlubJagiellonski/pola-backend/actions/workflows/migration_check.yml>`__ na Github Action korzystając z twojej gałęzi.
 
 Nie jest wspieranie testowania migracji dla pull-requestów z forków. Kod musi być w naszym repozytorium.

@@ -27,6 +27,8 @@ servers:
     description: CI environemnt
   - url: http://0.0.0.0:8080
     description: Docker
+  - url: http://127.0.0.1:8080
+    description: Local
 
 paths:
   /a/v4/get_by_code:
@@ -53,6 +55,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/QueryFilter'
         - $ref: '#/components/parameters/PageToken'
+        - $ref: '#/components/parameters/DeviceIdOptional'
       responses:
         '200':
           description: Success.
@@ -62,6 +65,33 @@ paths:
                 $ref: '#/components/schemas/SearchResultCollection'
         '400':
           $ref: '#/components/responses/BadRequest'
+
+  /a/v4/subscribe_newsletter:
+    post:
+      summary: Subscribe to a newsletter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubscribeNewsletterRequest'
+      responses:
+        '204':
+          description: "No error"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: The throttling limit has been reached.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: The server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
 components:
   parameters:
@@ -86,12 +116,21 @@ components:
       schema:
         type: string
 
+    DeviceIdOptional:
+      name: device_id
+      in: query
+      required: false
+      schema:
+        type: string
+
     QueryFilter:
       name: query
       in: query
       required: true
       schema:
         type: string
+        minLength: 1
+        maxLength: 255
 
     PageToken:
       name: pageToken
@@ -115,7 +154,24 @@ components:
         application/json:
           schema:
             type: object
+            additionalProperties: false
             properties:
+              all_company_brands:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    name:
+                      type: string
+                    logotype_url:
+                      type: string
+                      nullable: true
+                    website_url:
+                      type: string
+                  required:
+                    - name
+                    - logotype_url
               altText:
                 type: string
                 nullable: true
@@ -125,6 +181,7 @@ components:
                 type: string
               donate:
                 type: object
+                additionalProperties: false
                 properties:
                   show_button:
                     type: boolean
@@ -142,6 +199,7 @@ components:
                 type: array
                 items:
                   type: object
+                  additionalProperties: false
                   properties:
                     name:
                       type: string
@@ -178,6 +236,22 @@ components:
                     plWorkers_notes:
                       type: string
                       nullable: true
+                    sources:
+                      type: object
+                      additionalProperties: true
+                    is_friend:
+                      type: boolean
+                    description:
+                      type: string
+                    friend_text:
+                      type: string
+                      nullable: true
+                    logotype_url:
+                      type: string
+                      nullable: true
+                    official_url:
+                      type: string
+                      nullable: true
                   required:
                     - name
                     - plCapital
@@ -196,6 +270,7 @@ components:
                 nullable: true
               report:
                 type: object
+                additionalProperties: false
                 properties:
                   button_text:
                     type: string
@@ -214,6 +289,7 @@ components:
   schemas:
     SearchResultCollection:
       type: object
+      additionalProperties: false
       properties:
         nextPageToken:
           type: string
@@ -222,6 +298,7 @@ components:
           type: array
           items:
             type: object
+            additionalProperties: false
             properties:
               name:
                 type: string
@@ -229,6 +306,7 @@ components:
                 type: string
               company:
                 type: object
+                additionalProperties: false
                 nullable: true
                 properties:
                   name:
@@ -241,6 +319,7 @@ components:
                   - score
               brand:
                 type: object
+                additionalProperties: false
                 nullable: true
                 properties:
                   name:
@@ -261,6 +340,7 @@ components:
       description: |
         [RFC7807](https://tools.ietf.org/html/rfc7807) compliant response.
       type: object
+      additionalProperties: true
       properties:
         type:
           type: string
@@ -286,3 +366,16 @@ components:
         - type
         - title
         - status
+
+    SubscribeNewsletterRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        contact_email:
+          description: E-mail address of the contact that will be subscribed to the newsletter
+          type: string
+        contact_name:
+          description: Name of the contact that will be subscribed to the newsletter
+          type: string
+      required:
+        - contact_email

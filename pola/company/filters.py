@@ -2,7 +2,7 @@ from distutils.util import strtobool
 
 import django_filters
 from dal import autocomplete
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 
 from pola.filters import CrispyFilterMixin
 
@@ -10,7 +10,6 @@ from .models import Brand, Company
 
 
 class CompanyFilter(CrispyFilterMixin, django_filters.FilterSet):
-
     verified = django_filters.TypedChoiceFilter(
         choices=((None, _("----")), (True, _("Tak")), (False, _("Nie"))),
         coerce=strtobool,

@@ -1,3 +1,4 @@
+---
 name: Migration validation
 
 on:
@@ -19,19 +20,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout ${{ github.ref }} ( ${{ github.sha }} )
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 2
       - name: Login to Github Docker Registry
-        run: ./scripts/docker_login_github.sh
+        run: ./scripts/docker_login_github.py
       - name: Copy .env.example to .env
         run: cp .env.example .env
       - name: Build image
         run: ./scripts/ci-docker-image/build_image.sh
       - name: Clear volumes
-        run: docker-compose down --volumes
+        run: docker compose down --volumes
       - name: Start PostgresSQL
-        run: docker-compose up --detach --no-deps postgres
+        run: docker compose up --detach --no-deps postgres
       - name: Download database backup
         run: heroku pg:backups:download --app "${HEROKU_APP}" --output /tmp/latest.dump
         env:
@@ -63,9 +64,9 @@ jobs:
               -U pola_app \
               -d pola_app /tmp/latest.dump
       - name: Migrate database
-        run: docker-compose run --no-deps --rm web /app/manage.py migrate
+        run: docker compose run --no-deps --rm web /app/manage.py migrate
       - name: Remove all data
         run: |
           set -x;
           rm /tmp/latest.dump;
-          docker-compose down --volumes
+          docker compose down --volumes

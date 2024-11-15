@@ -18,7 +18,7 @@ class SetRemoteAddrFromForwardedFor(MiddlewareMixin):
 
     def process_request(self, request):
         try:
-            real_ip = request.META['HTTP_X_FORWARDED_FOR']
+            real_ip = request.headers['x-forwarded-for']
         except KeyError:
             return None
         else:
@@ -35,7 +35,7 @@ def _get_redirect(new_hostname, request):
 
 class HostnameRedirectMiddleware(MiddlewareMixin):
     def process_request(self, request):
-        server_name = request.META['HTTP_HOST']
+        server_name = request.headers['host']
         catchall = getattr(settings, 'SECURE_SSL_HOST', None)
         # if catchall hostname is set, verify that the current
         # hostname is valid, and redirect if not
@@ -43,3 +43,14 @@ class HostnameRedirectMiddleware(MiddlewareMixin):
             if server_name != catchall:
                 return _get_redirect(catchall, request)
         return None
+
+
+class SetHostToLocalhost(MiddlewareMixin):
+    """
+    Sets the remote host to the local host to bypass OpenAPI-core servers validation.
+
+    For detaisl, see: https://github.com/python-openapi/openapi-core/issues/264
+    """
+
+    def process_request(self, request):
+        request.META['HTTP_X_FORWARDED_HOST'] = '127.0.0.1:8080'
